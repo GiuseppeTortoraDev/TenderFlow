@@ -1,4 +1,4 @@
-import { Component, inject, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
@@ -11,11 +11,10 @@ import { AuthService } from '../../services/auth.service';
 })
 export class AuthComponent {
   private authService = inject(AuthService);
-  private cdr = inject(ChangeDetectorRef);
 
-  isLoginMode = true;
-  isLoading = false;
-  errorMessage = '';
+  isLoginMode = signal(true);
+  isLoading = signal(false);
+  errorMessage = signal('');
 
   formData = {
     fullName: '',
@@ -25,29 +24,25 @@ export class AuthComponent {
   };
 
   toggleMode(): void {
-    this.isLoginMode = !this.isLoginMode;
-    this.errorMessage = '';
-    this.cdr.detectChanges();
+    this.isLoginMode.update((mode) => !mode);
+    this.errorMessage.set('');
   }
 
   onSubmit(): void {
-    this.isLoading = true;
-    this.errorMessage = '';
-    this.cdr.detectChanges();
+    this.isLoading.set(true);
+    this.errorMessage.set('');
 
-    const request$ = this.isLoginMode
+    const request$ = this.isLoginMode()
       ? this.authService.login({ email: this.formData.email, password: this.formData.password })
       : this.authService.register(this.formData);
 
     request$.subscribe({
       next: () => {
-        this.isLoading = false;
-        this.cdr.detectChanges();
+        this.isLoading.set(false);
       },
       error: (err) => {
-        this.isLoading = false;
-        this.errorMessage = err.error?.error || 'Errore di autenticazione. Verifica i dati.';
-        this.cdr.detectChanges();
+        this.isLoading.set(false);
+        this.errorMessage.set(err.error?.error || 'Errore di autenticazione. Verifica i dati.');
       }
     });
   }

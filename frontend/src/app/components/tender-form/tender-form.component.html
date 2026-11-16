@@ -1,7 +1,11 @@
 <div class="card border-0 shadow-sm rounded-3 mb-4">
   <div class="card-body p-4">
     <h4 class="fw-bold text-dark mb-3">Nuova Gara d'Appalto</h4>
-    
+
+    <div *ngIf="feedbackError()" class="alert alert-danger py-2 small">
+      {{ feedbackError() }}
+    </div>
+
     <form (ngSubmit)="onSubmit()" #tenderForm="ngForm">
       <div class="mb-3">
         <label for="title" class="form-label small fw-semibold text-secondary">Titolo Gara *</label>
@@ -14,22 +18,25 @@
       </div>
 
       <div class="row g-3 mb-4">
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label for="budget" class="form-label small fw-semibold text-secondary">Budget (€) *</label>
-          <input type="number" id="budget" class="form-control" [(ngModel)]="newTender.budget" name="budget" placeholder="50000" required />
+          <input type="number" id="budget" class="form-control" [(ngModel)]="newTender.budget" name="budget" placeholder="50000" min="1" required />
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
+          <label for="closingDate" class="form-label small fw-semibold text-secondary">Scadenza Offerte</label>
+          <input type="date" id="closingDate" class="form-control" [(ngModel)]="newTender.closingDate" name="closingDate" />
+        </div>
+        <div class="col-md-4">
           <label for="status" class="form-label small fw-semibold text-secondary">Stato Iniziale</label>
           <select id="status" class="form-select" [(ngModel)]="newTender.status" name="status">
-            <option value="DRAFT">DRAFT</option>
             <option value="OPEN">OPEN</option>
-            <option value="CLOSED">CLOSED</option>
+            <option value="DRAFT">DRAFT</option>
           </select>
         </div>
       </div>
 
-      <button type="submit" class="btn btn-success fw-semibold px-4" [disabled]="!tenderForm.form.valid">
-        Crea Gara
+      <button type="submit" class="btn btn-success fw-semibold px-4" [disabled]="!tenderForm.form.valid || isSubmitting()">
+        {{ isSubmitting() ? 'Creazione...' : 'Crea Gara' }}
       </button>
     </form>
   </div>

@@ -20,15 +20,17 @@ public class TenderResourceTest {
 
     @BeforeAll
     public static void setupTokens() {
-        buyerToken = Jwt.issuer("https://tenderflow.com/issuer")
-                .upn("buyer@tenderflow.com")
+        buyerToken = Jwt.issuer("https://tenderflow.it/issuer")
+                .upn("buyer@tenderflow.it")
                 .groups(Set.of("BUYER"))
+                .claim("fullName", "Buyer Test Srl")
                 .expiresIn(3600)
                 .sign();
 
-        supplierToken = Jwt.issuer("https://tenderflow.com/issuer")
-                .upn("supplier@tenderflow.com")
+        supplierToken = Jwt.issuer("https://tenderflow.it/issuer")
+                .upn("supplier@tenderflow.it")
                 .groups(Set.of("SUPPLIER"))
+                .claim("fullName", "Supplier Test SpA")
                 .expiresIn(3600)
                 .sign();
     }

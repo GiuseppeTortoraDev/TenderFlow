@@ -3,20 +3,20 @@
     <div class="card border-0 shadow-sm rounded-3">
       <div class="card-body p-4">
         <h4 class="fw-bold text-dark mb-1">
-          {{ isLoginMode ? 'Accedi a TenderFlow' : 'Crea un Account' }}
+          {{ isLoginMode() ? 'Accedi a TenderFlow' : 'Crea un Account' }}
         </h4>
         <p class="text-muted small mb-4">
-          {{ isLoginMode ? 'Inserisci le tue credenziali per continuare' : 'Registrati e scegli il tuo ruolo operativo' }}
+          {{ isLoginMode() ? 'Inserisci le tue credenziali per continuare' : 'Registrati e scegli il tuo ruolo operativo' }}
         </p>
 
         <!-- Messaggio di Errore -->
-        <div *ngIf="errorMessage" class="alert alert-danger py-2 small">
-          {{ errorMessage }}
+        <div *ngIf="errorMessage()" class="alert alert-danger py-2 small">
+          {{ errorMessage() }}
         </div>
 
         <form (ngSubmit)="onSubmit()" #authForm="ngForm">
           <!-- Nome Completo (solo in fase di registrazione) -->
-          <div *ngIf="!isLoginMode" class="mb-3">
+          <div *ngIf="!isLoginMode()" class="mb-3">
             <label for="fullName" class="form-label small fw-semibold text-secondary">Nome Completo / Azienda *</label>
             <input type="text" id="fullName" class="form-control" [(ngModel)]="formData.fullName" name="fullName" placeholder="Es. Mario Rossi Srl" required />
           </div>
@@ -34,7 +34,7 @@
           </div>
 
           <!-- Scelta Ruolo (solo in fase di registrazione) -->
-          <div *ngIf="!isLoginMode" class="mb-4">
+          <div *ngIf="!isLoginMode()" class="mb-4">
             <label for="role" class="form-label small fw-semibold text-secondary">Ruolo Piattaforma *</label>
             <select id="role" class="form-select" [(ngModel)]="formData.role" name="role" required>
               <option value="BUYER">BUYER (Pubblica e gestisce gare d'appalto)</option>
@@ -42,8 +42,8 @@
             </select>
           </div>
 
-          <button type="submit" class="btn btn-primary w-100 fw-semibold py-2" [disabled]="!authForm.form.valid || isLoading">
-            {{ isLoading ? 'Attendere...' : (isLoginMode ? 'Accedi' : 'Registrati e Accedi') }}
+          <button type="submit" class="btn btn-primary w-100 fw-semibold py-2" [disabled]="!authForm.form.valid || isLoading()">
+            {{ isLoading() ? 'Attendere...' : (isLoginMode() ? 'Accedi' : 'Registrati e Accedi') }}
           </button>
         </form>
 
@@ -51,10 +51,10 @@
 
         <div class="text-center small">
           <span class="text-muted">
-            {{ isLoginMode ? 'Non hai ancora un account?' : 'Hai già un account?' }}
+            {{ isLoginMode() ? 'Non hai ancora un account?' : 'Hai già un account?' }}
           </span>
           <button type="button" class="btn btn-link btn-sm fw-semibold text-decoration-none p-0 ms-1" (click)="toggleMode()">
-            {{ isLoginMode ? 'Registrati ora' : 'Accedi' }}
+            {{ isLoginMode() ? 'Registrati ora' : 'Accedi' }}
           </button>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { Component, inject, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TenderService } from '../../services/tender.service';
@@ -13,42 +13,46 @@ import { Tender } from '../../models/tender.model';
 })
 export class TenderFormComponent {
   private tenderService = inject(TenderService);
-  private cdr = inject(ChangeDetectorRef);
 
   newTender: Partial<Tender> = {
     title: '',
     description: '',
     budget: undefined,
-    status: 'DRAFT'
+    closingDate: '',
+    status: 'OPEN'
   };
 
-  isSubmitting = false;
+  isSubmitting = signal(false);
+  feedbackError = signal('');
 
   onSubmit(): void {
     if (!this.newTender.title || !this.newTender.description || !this.newTender.budget) {
       return;
     }
 
-    this.isSubmitting = true;
-    this.cdr.detectChanges();
+    this.isSubmitting.set(true);
+    this.feedbackError.set('');
 
-    this.tenderService.createTender(this.newTender as Tender).subscribe({
+    const payload: Tender = {
+      ...(this.newTender as Tender),
+      closingDate: this.newTender.closingDate || undefined
+    };
+
+    this.tenderService.createTender(payload).subscribe({
       next: () => {
         this.newTender = {
           title: '',
           description: '',
           budget: undefined,
-          status: 'DRAFT'
+          closingDate: '',
+          status: 'OPEN'
         };
-        this.isSubmitting = false;
-        this.cdr.detectChanges();
-        window.location.reload();
+        this.isSubmitting.set(false);
       },
       error: (err) => {
         console.error('Errore creazione gara:', err);
-        alert('Errore ' + err.status + ': verifica che il token JWT sia valido.');
-        this.isSubmitting = false;
-        this.cdr.detectChanges();
+        this.feedbackError.set(err.error?.message || `Errore ${err.status}: verifica i dati o il token JWT.`);
+        this.isSubmitting.set(false);
       }
     });
   }
