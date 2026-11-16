@@ -3,12 +3,51 @@
     <div class="d-flex justify-content-between align-items-start mb-3">
       <div>
         <h4 class="fw-bold text-dark mb-1">Elenco Gare d'Appalto</h4>
-        <p class="text-secondary small mb-0">Monitoraggio in tempo reale dal backend Quarkus</p>
+        <p class="text-secondary small mb-0">Filtra, consulta o partecipa alle gare attive</p>
       </div>
-      <button class="btn btn-primary fw-semibold px-3 py-2" (click)="tenderService.loadTenders()">
+      <button class="btn btn-primary btn-sm fw-semibold px-3 py-2" (click)="tenderService.loadTenders()">
         Aggiorna Lista
       </button>
     </div>
+
+    <!-- Barra Filtri & Ordinamento -->
+    <form (ngSubmit)="applyFilters()" class="row g-2 bg-light p-3 rounded-3 border mb-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold text-secondary mb-1">Titolo</label>
+        <input type="text" class="form-control form-control-sm" [(ngModel)]="searchTitle" name="searchTitle" placeholder="Cerca parola chiave..." />
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold text-secondary mb-1">Stato</label>
+        <select class="form-select form-select-sm" [(ngModel)]="filterStatus" name="filterStatus">
+          <option value="">Tutti</option>
+          <option value="OPEN">OPEN</option>
+          <option value="DRAFT">DRAFT</option>
+          <option value="CLOSED">CLOSED</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold text-secondary mb-1">Budget Min (€)</label>
+        <input type="number" class="form-control form-control-sm" [(ngModel)]="minBudget" name="minBudget" placeholder="0" min="0" />
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold text-secondary mb-1">Budget Max (€)</label>
+        <input type="number" class="form-control form-control-sm" [(ngModel)]="maxBudget" name="maxBudget" placeholder="Max" min="0" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold text-secondary mb-1">Ordina per</label>
+        <select class="form-select form-select-sm" [(ngModel)]="sortOption" name="sortOption" (change)="applyFilters()">
+          <option value="id:desc">Più recenti</option>
+          <option value="id:asc">Meno recenti</option>
+          <option value="budget:desc">Budget: dal più alto</option>
+          <option value="budget:asc">Budget: dal più basso</option>
+          <option value="closingDate:asc">Scadenza imminente</option>
+        </select>
+      </div>
+      <div class="col-12 d-flex justify-content-end gap-2 mt-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="resetFilters()">Reset</button>
+        <button type="submit" class="btn btn-dark btn-sm fw-semibold px-3">Applica Filtri</button>
+      </div>
+    </form>
 
     <div *ngIf="tenderService.errorMessage()" class="alert alert-danger py-2 small">
       {{ tenderService.errorMessage() }}
@@ -19,26 +58,29 @@
     </div>
 
     <div *ngIf="!tenderService.isLoading() && tenderService.tenders().length === 0" class="p-3 bg-light rounded-3 text-secondary small">
-      Nessuna gara d'appalto disponibile.
+      Nessuna gara d'appalto trovata con i filtri selezionati.
     </div>
 
-    <div *ngIf="!tenderService.isLoading() && tenderService.tenders().length > 0" class="table-responsive mt-3">
+    <!-- Tabella Gare -->
+    <div *ngIf="!tenderService.isLoading() && tenderService.tenders().length > 0" class="table-responsive mt-2">
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th scope="col" style="width: 70px;">ID</th>
+            <th scope="col" style="width: 65px;">ID</th>
             <th scope="col">Titolo Gara</th>
-            <th scope="col">Descrizione</th>
             <th scope="col">Scadenza</th>
             <th scope="col" class="text-end">Budget (€)</th>
             <th scope="col" class="text-center" style="width: 110px;">Stato</th>
+            <th scope="col" class="text-end" style="width: 145px;">Azioni</th>
           </tr>
         </thead>
         <tbody class="small">
-          <tr *ngFor="let tender of tenderService.tenders()">
+          <tr *ngFor="let tender of tenderService.tenders()" [class.table-active]="selectedTender()?.id === tender.id">
             <td class="fw-bold text-muted">#{{ tender.id }}</td>
-            <td class="fw-semibold text-dark">{{ tender.title }}</td>
-            <td class="text-secondary">{{ tender.description }}</td>
+            <td>
+              <div class="fw-semibold text-dark">{{ tender.title }}</div>
+              <div class="text-secondary text-truncate" style="max-width: 280px;">{{ tender.description }}</div>
+            </td>
             <td class="text-muted">{{ tender.closingDate || '—' }}</td>
             <td class="text-end fw-bold text-dark">
               {{ tender.budget | currency:'EUR':'symbol':'1.2-2' }}
@@ -53,9 +95,133 @@
                 {{ tender.status }}
               </span>
             </td>
+            <td class="text-end">
+              <button class="btn btn-sm fw-semibold"
+                      [ngClass]="selectedTender()?.id === tender.id ? 'btn-dark' : 'btn-outline-primary'"
+                      (click)="toggleDetails(tender)">
+                {{ selectedTender()?.id === tender.id ? 'Chiudi' : 'Dettagli / Offerte' }}
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Controlli Paginazione -->
+    <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top small">
+      <span class="text-muted">Pagina {{ tenderService.filters().page + 1 }}</span>
+      <div class="btn-group btn-group-sm">
+        <button class="btn btn-outline-secondary"
+                [disabled]="tenderService.filters().page === 0 || tenderService.isLoading()"
+                (click)="changePage(-1)">
+          ← Precedente
+        </button>
+        <button class="btn btn-outline-secondary"
+                [disabled]="tenderService.tenders().length < tenderService.filters().size || tenderService.isLoading()"
+                (click)="changePage(1)">
+          Successiva →
+        </button>
+      </div>
+    </div>
+
+    <!-- Pannello Dettaglio Gara & Offerte -->
+    <div *ngIf="selectedTender() as current" class="mt-4 p-4 bg-light rounded-3 border">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+          <span class="text-uppercase text-muted fw-bold" style="font-size: 0.72rem;">Gara #{{ current.id }}</span>
+          <h5 class="fw-bold text-dark mb-1">{{ current.title }}</h5>
+          <p class="text-secondary small mb-0">{{ current.description }}</p>
+        </div>
+
+        <!-- Pulsante BUYER: Chiudi e Aggiudica -->
+        <div *ngIf="authService.userRole() === 'BUYER' && current.status === 'OPEN'">
+          <button class="btn btn-danger btn-sm fw-semibold px-3 py-2"
+                  [disabled]="isClosingTender()"
+                  (click)="onCloseTender()">
+            {{ isClosingTender() ? 'Chiusura in corso...' : 'Chiudi e Aggiudica Gara' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Messaggi di feedback -->
+      <div *ngIf="actionFeedback() as fb" class="alert py-2 small" [ngClass]="'alert-' + fb.type">
+        {{ fb.text }}
+      </div>
+
+      <!-- Form SUPPLIER: Invio Offerta -->
+      <div *ngIf="authService.userRole() === 'SUPPLIER' && current.status === 'OPEN'" class="card border-0 shadow-sm mb-3">
+        <div class="card-body p-3">
+          <h6 class="fw-bold text-dark small mb-2">Invia la tua Offerta Economica</h6>
+          <form (ngSubmit)="onSubmitBid()" #bidForm="ngForm" class="row g-2 align-items-center">
+            <div class="col-sm-6 col-md-5">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">€</span>
+                <input type="number"
+                       class="form-control"
+                       [(ngModel)]="bidAmount"
+                       name="bidAmount"
+                       placeholder="Importo offerta"
+                       min="1"
+                       [max]="current.budget"
+                       step="0.01"
+                       required />
+              </div>
+            </div>
+            <div class="col-auto">
+              <button type="submit"
+                      class="btn btn-success btn-sm fw-semibold px-3"
+                      [disabled]="!bidForm.form.valid || isSubmittingBid()">
+                {{ isSubmittingBid() ? 'Invio...' : 'Sottometti Offerta' }}
+              </button>
+            </div>
+            <div class="col-12">
+              <small class="text-muted">
+                Budget massimo consentito: <strong>{{ current.budget | currency:'EUR':'symbol':'1.2-2' }}</strong>.
+                L'offerta verrà registrata a nome di <strong>{{ authService.currentUser()?.fullName }}</strong>.
+              </small>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Lista Offerte Ricevute -->
+      <h6 class="fw-bold text-dark small mb-2">
+        Offerte Ricevute ({{ bids().length }})
+      </h6>
+
+      <div *ngIf="isLoadingBids()" class="text-muted small">Caricamento offerte...</div>
+
+      <div *ngIf="!isLoadingBids() && bids().length === 0" class="text-muted small">
+        Nessuna offerta ancora presentata per questa gara.
+      </div>
+
+      <div *ngIf="!isLoadingBids() && bids().length > 0" class="table-responsive bg-white rounded-2 border">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th scope="col" class="ps-3">Pos.</th>
+              <th scope="col">Fornitore</th>
+              <th scope="col">Data Invio</th>
+              <th scope="col" class="text-end pe-3">Importo Offerto</th>
+            </tr>
+          </thead>
+          <tbody class="small">
+            <tr *ngFor="let bid of bids(); let i = index" [class.table-success]="i === 0">
+              <td class="ps-3 fw-bold">
+                #{{ i + 1 }}
+                <span *ngIf="i === 0" class="badge bg-success ms-1">
+                  {{ current.status === 'CLOSED' ? 'VINCITORE' : 'MIGLIORE' }}
+                </span>
+              </td>
+              <td class="fw-semibold text-dark">{{ bid.bidderName }}</td>
+              <td class="text-muted">{{ bid.submissionDate | date:'dd/MM/yyyy HH:mm' }}</td>
+              <td class="text-end pe-3 fw-bold text-dark">
+                {{ bid.amount | currency:'EUR':'symbol':'1.2-2' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>

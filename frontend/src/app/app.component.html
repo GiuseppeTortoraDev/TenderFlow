@@ -1,13 +1,18 @@
 <div class="bg-light min-vh-100 py-4">
-  <div class="container" style="max-width: 900px;">
+  <div class="container" style="max-width: 960px;">
     <!-- Header Principale -->
-    <header class="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom">
+    <header class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4 pb-3 border-bottom">
       <div>
         <h2 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
           <span class="badge bg-primary rounded-3 fs-6 px-3 py-2">TF</span>
           TenderFlow Enterprise
+          <span class="badge rounded-pill fs-6 fw-normal"
+                style="font-size: 0.72rem !important;"
+                [ngClass]="eventStream.isConnected() ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-secondary-subtle text-secondary'">
+            {{ eventStream.isConnected() ? '● Kafka Live' : '○ Offline' }}
+          </span>
         </h2>
-        <p class="text-muted small mb-0">Gestione Gare d'Appalto & Integrazione Backend Quarkus</p>
+        <p class="text-muted small mb-0">Gestione Gare d'Appalto Event-Driven (Quarkus + Kafka + Angular)</p>
       </div>
 
       <!-- Barra Utente Loggato / Pulsante Esci -->
@@ -24,17 +29,26 @@
       </div>
     </header>
 
+    <!-- Notifica Real-Time da Kafka SSE -->
+    <div *ngIf="eventStream.latestNotification() as notif"
+         class="alert alert-info alert-dismissible fade show shadow-sm d-flex align-items-center justify-content-between py-2 px-3 mb-4 small"
+         role="alert">
+      <div>
+        <span class="badge bg-primary me-2">LIVE</span>
+        <strong>{{ notif.message }}</strong>
+      </div>
+      <button type="button" class="btn-close btn-sm" aria-label="Chiudi" (click)="eventStream.dismissNotification()"></button>
+    </div>
+
     <!-- Se NON sei loggato: mostra Login / Registrazione -->
     <app-auth *ngIf="!authService.isAuthenticated()"></app-auth>
 
     <!-- Se SEI loggato: mostra l'app in base al ruolo -->
     <div *ngIf="authService.isAuthenticated()" class="row g-4">
-      <!-- Solo il BUYER vede il form per creare nuove gare -->
       <div class="col-12" *ngIf="authService.userRole() === 'BUYER'">
         <app-tender-form></app-tender-form>
       </div>
 
-      <!-- Sia BUYER che SUPPLIER vedono l'elenco gare -->
       <div class="col-12">
         <app-tender-list></app-tender-list>
       </div>

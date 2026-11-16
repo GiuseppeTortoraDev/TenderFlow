@@ -6,10 +6,12 @@ import com.tenderflow.model.Tender;
 import io.quarkus.panache.common.Page;
 import io.quarkus.panache.common.Sort;
 import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
@@ -27,6 +29,9 @@ import java.util.List;
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Bid Management", description = "Sottomissione e consultazione offerte per gara")
 public class BidResource {
+
+    @Inject
+    JsonWebToken jwt;
 
     @Channel("bid-events-out")
     Emitter<Bid> bidEmitter;
@@ -61,6 +66,12 @@ public class BidResource {
             throw new BusinessException("L'importo dell'offerta supera il budget massimo della gara");
         }
 
+        String authenticatedName = jwt.getClaim("fullName");
+        if (authenticatedName == null || authenticatedName.isBlank()) {
+            authenticatedName = jwt.getName() != null ? jwt.getName() : bid.bidderName;
+        }
+
+        bid.bidderName = authenticatedName;
         bid.tender = tender;
         bid.submissionDate = LocalDateTime.now();
         bid.persist();

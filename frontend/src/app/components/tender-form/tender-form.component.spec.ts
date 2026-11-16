@@ -1,16 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { TenderForm } from './tender-form.component';
+import { provideHttpClient } from '@angular/common/http';
+import { TenderFormComponent } from './tender-form.component';
 
-describe('TenderForm', () => {
-  let component: TenderForm;
-  let fixture: ComponentFixture<TenderForm>;
+describe('TenderFormComponent', () => {
+  let component: TenderFormComponent;
+  let fixture: ComponentFixture<TenderFormComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [TenderForm],
+      imports: [TenderFormComponent],
+      providers: [provideHttpClient()]
     }).compileComponents();
 
-    fixture = TestBed.createComponent(TenderForm);
+    fixture = TestBed.createComponent(TenderFormComponent);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });

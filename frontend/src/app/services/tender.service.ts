@@ -1,7 +1,18 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { Tender } from '../models/tender.model';
+
+export interface TenderFilters {
+  title?: string;
+  status?: string;
+  minBudget?: number | null;
+  maxBudget?: number | null;
+  page: number;
+  size: number;
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
+}
 
 @Injectable({
   providedIn: 'root'
@@ -10,16 +21,50 @@ export class TenderService {
   private http = inject(HttpClient);
   private readonly apiUrl = 'http://localhost:8081/api/tenders';
 
-  // Stato reattivo condiviso tra Form e Lista
   tenders = signal<Tender[]>([]);
   isLoading = signal<boolean>(false);
   errorMessage = signal<string>('');
 
-  loadTenders(): void {
+  filters = signal<TenderFilters>({
+    title: '',
+    status: '',
+    minBudget: null,
+    maxBudget: null,
+    page: 0,
+    size: 5,
+    sortBy: 'id',
+    sortOrder: 'desc'
+  });
+
+  loadTenders(customFilters?: Partial<TenderFilters>): void {
+    if (customFilters) {
+      this.filters.update((prev) => ({ ...prev, ...customFilters }));
+    }
+
+    const current = this.filters();
+    let params = new HttpParams()
+      .set('page', current.page.toString())
+      .set('size', current.size.toString())
+      .set('sortBy', current.sortBy)
+      .set('sortOrder', current.sortOrder);
+
+    if (current.title && current.title.trim()) {
+      params = params.set('title', current.title.trim());
+    }
+    if (current.status) {
+      params = params.set('status', current.status);
+    }
+    if (current.minBudget !== null && current.minBudget !== undefined) {
+      params = params.set('minBudget', current.minBudget.toString());
+    }
+    if (current.maxBudget !== null && current.maxBudget !== undefined) {
+      params = params.set('maxBudget', current.maxBudget.toString());
+    }
+
     this.isLoading.set(true);
     this.errorMessage.set('');
 
-    this.http.get<Tender[]>(this.apiUrl).subscribe({
+    this.http.get<Tender[]>(this.apiUrl, { params }).subscribe({
       next: (data) => {
         this.tenders.set(data);
         this.isLoading.set(false);
@@ -34,9 +79,9 @@ export class TenderService {
 
   createTender(tender: Tender): Observable<Tender> {
     return this.http.post<Tender>(this.apiUrl, tender).pipe(
-      tap((created) => {
-        // Aggiorna istantaneamente la lista in memoria senza reload
-        this.tenders.update((current) => [...current, created]);
+      tap(() => {
+        // Ricarica la prima pagina rispettando i filtri e l'ordinamento correnti
+        this.loadTenders({ page: 0 });
       })
     );
   }
