@@ -282,4 +282,15 @@ public class TenderResourceTest {
                 .statusCode(200)
                 .contentType("application/pdf");
     }
+
+    @Test
+    public void testProcurementAnalyticsStats() {
+        given()
+                .when()
+                .get("/api/tenders/stats")
+                .then()
+                .statusCode(200)
+                .body("totalTenders", notNullValue())
+                .body("averageSavingsPercentage", notNullValue());
+    }
 }

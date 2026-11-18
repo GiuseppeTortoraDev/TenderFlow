@@ -1,5 +1,6 @@
 package com.tenderflow.controller;
 
+import com.tenderflow.dto.TenderStatsDTO;
 import com.tenderflow.exception.BusinessException;
 import com.tenderflow.model.Bid;
 import com.tenderflow.model.Tender;
@@ -34,8 +35,12 @@ import org.jboss.resteasy.reactive.RestForm;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Files;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Path("/api/tenders")
 @ApplicationScoped
@@ -275,5 +280,79 @@ public class TenderResource {
         return Response.ok(filePath.toFile(), "application/pdf")
                 .header("Content-Disposition", "inline; filename=\"" + downloadName + "\"")
                 .build();
+    }
+
+    @GET
+    @Path("/stats")
+    @PermitAll
+    @Operation(summary = "Statistiche e KPI procurement", description = "Restituisce metriche aggregate su gare, volumi aggiudicati, risparmio medio e top fornitori.")
+    public TenderStatsDTO getStats() {
+        List<Tender> allTenders = Tender.listAll();
+        long totalBids = Bid.count();
+
+        long openCount = allTenders.stream().filter(t -> "OPEN".equalsIgnoreCase(t.status)).count();
+        long draftCount = allTenders.stream().filter(t -> "DRAFT".equalsIgnoreCase(t.status)).count();
+        long closedCount = allTenders.stream().filter(t -> "CLOSED".equalsIgnoreCase(t.status)).count();
+
+        BigDecimal totalOpenBudget = allTenders.stream()
+                .filter(t -> "OPEN".equalsIgnoreCase(t.status) && t.budget != null)
+                .map(t -> t.budget)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<Tender> awardedTenders = allTenders.stream()
+                .filter(t -> "CLOSED".equalsIgnoreCase(t.status)
+                        && t.winningAmount != null
+                        && t.budget != null
+                        && t.budget.compareTo(BigDecimal.ZERO) > 0)
+                .toList();
+
+        BigDecimal totalAwardedVolume = awardedTenders.stream()
+                .map(t -> t.winningAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalAwardedBudget = awardedTenders.stream()
+                .map(t -> t.budget)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalSavingsAmount = totalAwardedBudget.subtract(totalAwardedVolume).max(BigDecimal.ZERO);
+
+        double averageSavingsPercentage = 0.0;
+        if (!awardedTenders.isEmpty()) {
+            double sumPct = awardedTenders.stream()
+                    .mapToDouble(t -> t.budget.subtract(t.winningAmount)
+                            .divide(t.budget, 4, RoundingMode.HALF_UP)
+                            .multiply(BigDecimal.valueOf(100))
+                            .doubleValue())
+                    .sum();
+            averageSavingsPercentage = Math.round((sumPct / awardedTenders.size()) * 100.0) / 100.0;
+        }
+
+        Map<String, List<Tender>> byWinner = awardedTenders.stream()
+                .filter(t -> t.winningBidderName != null && !t.winningBidderName.isBlank())
+                .collect(Collectors.groupingBy(t -> t.winningBidderName));
+
+        List<TenderStatsDTO.TopSupplierDTO> topSuppliers = byWinner.entrySet().stream()
+                .map(entry -> new TenderStatsDTO.TopSupplierDTO(
+                        entry.getKey(),
+                        entry.getValue().size(),
+                        entry.getValue().stream().map(t -> t.winningAmount).reduce(BigDecimal.ZERO, BigDecimal::add)
+                ))
+                .sorted(Comparator.comparingLong(TenderStatsDTO.TopSupplierDTO::wonCount).reversed()
+                        .thenComparing(TenderStatsDTO.TopSupplierDTO::totalWonVolume, Comparator.reverseOrder()))
+                .limit(5)
+                .toList();
+
+        return new TenderStatsDTO(
+                allTenders.size(),
+                openCount,
+                draftCount,
+                closedCount,
+                totalBids,
+                totalOpenBudget,
+                totalAwardedVolume,
+                totalSavingsAmount,
+                averageSavingsPercentage,
+                topSuppliers
+        );
     }
 }

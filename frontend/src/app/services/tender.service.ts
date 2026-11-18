@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
-import { Tender } from '../models/tender.model';
+import { Tender, TenderStats } from '../models/tender.model';
 
 export interface TenderFilters {
   title?: string;
@@ -22,6 +22,7 @@ export class TenderService {
   private readonly apiUrl = 'api/tenders';
 
   tenders = signal<Tender[]>([]);
+  stats = signal<TenderStats | null>(null);
   isLoading = signal<boolean>(false);
   errorMessage = signal<string>('');
 
@@ -35,6 +36,13 @@ export class TenderService {
     sortBy: 'id',
     sortOrder: 'desc'
   });
+
+  loadStats(): void {
+    this.http.get<TenderStats>(`${this.apiUrl}/stats`).subscribe({
+      next: (data) => this.stats.set(data),
+      error: (err) => console.error('Errore caricamento KPI:', err)
+    });
+  }
 
   loadTenders(customFilters?: Partial<TenderFilters>): void {
     if (customFilters) {
@@ -68,6 +76,7 @@ export class TenderService {
       next: (data) => {
         this.tenders.set(data);
         this.isLoading.set(false);
+        this.loadStats();
       },
       error: (err) => {
         console.error('Errore recupero gare:', err);
@@ -91,16 +100,27 @@ export class TenderService {
         this.tenders.update((current) =>
           current.map((t) => (t.id === id ? updated : t))
         );
+        this.loadStats();
       })
     );
   }
 
   closeTender(id: number): Observable<any> {
     return this.http.put<any>(`${this.apiUrl}/${id}/close`, {}).pipe(
-      tap(() => {
+      tap((res) => {
         this.tenders.update((current) =>
-          current.map((t) => (t.id === id ? { ...t, status: 'CLOSED' } : t))
+          current.map((t) =>
+            t.id === id
+              ? {
+                  ...t,
+                  status: 'CLOSED',
+                  winningBidderName: res?.winningBid?.bidderName ?? t.winningBidderName,
+                  winningAmount: res?.winningBid?.amount ?? t.winningAmount
+                }
+              : t
+          )
         );
+        this.loadStats();
       })
     );
   }

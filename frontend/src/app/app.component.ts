@@ -6,11 +6,13 @@ import { TenderService } from './services/tender.service';
 import { AuthComponent } from './components/auth/auth.component';
 import { TenderFormComponent } from './components/tender-form/tender-form.component';
 import { TenderListComponent } from './components/tender-list/tender-list.component';
+import { AnalyticsDashboardComponent } from './components/analytics-dashboard/dashboard.component';
+
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, AuthComponent, TenderFormComponent, TenderListComponent],
+  imports: [CommonModule, AuthComponent, TenderFormComponent, TenderListComponent, AnalyticsDashboardComponent],
   templateUrl: './app.component.html'
 })
 export class AppComponent implements OnInit {
