@@ -5,7 +5,7 @@ import { TenderService } from '../../services/tender.service';
 import { BidService } from '../../services/bid.service';
 import { AuthService } from '../../services/auth.service';
 import { EventStreamService } from '../../services/event-stream.service';
-import { Tender } from '../../models/tender.model';
+import { Tender, AuditLogEntry } from '../../models/tender.model';
 import { Bid, TenderAwardResult } from '../../models/bid.model';
 
 @Component({
@@ -31,6 +31,7 @@ export class TenderListComponent implements OnInit {
   // Stato della gara selezionata/espansa
   selectedTender = signal<Tender | null>(null);
   bids = signal<Bid[]>([]);
+  auditLogs = signal<AuditLogEntry[]>([]);
   isLoadingBids = signal<boolean>(false);
 
   // Eventuale offerta già inviata dal SUPPLIER corrente
@@ -57,6 +58,9 @@ export class TenderListComponent implements OnInit {
       const current = this.selectedTender();
       if (notif?.type === 'BID_EVENT' && current?.id && notif.tenderId === current.id) {
         this.loadBids(current.id);
+        if (this.isTenderOwner(current)) {
+          this.loadAuditLogs(current.id);
+        }
       }
     });
   }
@@ -103,6 +107,7 @@ export class TenderListComponent implements OnInit {
   toggleDetails(tender: Tender): void {
     if (this.selectedTender()?.id === tender.id) {
       this.selectedTender.set(null);
+      this.auditLogs.set([]);
       return;
     }
 
@@ -113,6 +118,11 @@ export class TenderListComponent implements OnInit {
 
     if (tender.id) {
       this.loadBids(tender.id);
+      if (this.isTenderOwner(tender)) {
+        this.loadAuditLogs(tender.id);
+      } else {
+        this.auditLogs.set([]);
+      }
     }
   }
 
@@ -130,6 +140,33 @@ export class TenderListComponent implements OnInit {
           text: err.error?.message || 'Impossibile caricare le offerte.'
         });
         this.isLoadingBids.set(false);
+      }
+    });
+  }
+
+  loadAuditLogs(tenderId: number): void {
+    this.tenderService.getAuditLogs(tenderId).subscribe({
+      next: (logs) => this.auditLogs.set(logs),
+      error: () => this.auditLogs.set([])
+    });
+  }
+
+  onDownloadCsvReport(tender: Tender): void {
+    if (!tender.id) return;
+    this.tenderService.downloadCsvReport(tender.id).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `report-gara-${tender.id}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: () => {
+        this.actionFeedback.set({
+          type: 'danger',
+          text: 'Errore durante la generazione del report CSV.'
+        });
       }
     });
   }
@@ -177,6 +214,7 @@ export class TenderListComponent implements OnInit {
       next: (updated) => {
         this.isPublishingTender.set(false);
         this.selectedTender.set(updated);
+        this.loadAuditLogs(tender.id!);
         this.actionFeedback.set({
           type: 'success',
           text: 'Gara pubblicata con successo! Ora i fornitori possono inviare offerte.'
@@ -206,6 +244,7 @@ export class TenderListComponent implements OnInit {
         this.isClosingTender.set(false);
         this.awardResult.set(res);
         this.selectedTender.set({ ...tender, status: 'CLOSED' });
+        this.loadAuditLogs(tender.id!);
         this.actionFeedback.set({
           type: 'success',
           text: res.winningBid
@@ -250,6 +289,7 @@ export class TenderListComponent implements OnInit {
         );
         if (this.selectedTender()?.id === updatedTender.id) {
           this.selectedTender.set(updatedTender);
+          this.loadAuditLogs(updatedTender.id!);
         }
       },
       error: (err) => {

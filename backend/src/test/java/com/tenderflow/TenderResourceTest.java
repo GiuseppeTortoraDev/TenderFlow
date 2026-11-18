@@ -293,4 +293,46 @@ public class TenderResourceTest {
                 .body("totalTenders", notNullValue())
                 .body("averageSavingsPercentage", notNullValue());
     }
+
+    @Test
+    public void testAuditTrailAndCsvReportExport() {
+        String tenderJson = """
+            {
+                "title": "Gara Audit e Report",
+                "description": "Verifica log tracciabilita ed export CSV",
+                "budget": 30000.00,
+                "closingDate": "2026-12-31",
+                "status": "OPEN"
+            }
+            """;
+
+        Integer tenderId = given()
+                .auth().oauth2(buyerToken)
+                .contentType(ContentType.JSON)
+                .body(tenderJson)
+                .when()
+                .post("/api/tenders")
+                .then()
+                .statusCode(201)
+                .extract()
+                .path("id");
+
+        // Verifica Audit Trail -> almeno l'evento CREATED presente
+        given()
+                .auth().oauth2(buyerToken)
+                .when()
+                .get("/api/tenders/" + tenderId + "/audit")
+                .then()
+                .statusCode(200)
+                .body("[0].action", is("CREATED"));
+
+        // Verifica Export CSV -> 200 OK text/csv con intestazione
+        given()
+                .auth().oauth2(buyerToken)
+                .when()
+                .get("/api/tenders/" + tenderId + "/report.csv")
+                .then()
+                .statusCode(200)
+                .contentType("text/csv;charset=UTF-8");
+    }
 }

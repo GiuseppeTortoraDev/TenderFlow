@@ -1,0 +1,63 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1897 >>
+stream
+BT
+/F1 10 Tf
+45 790 Td
+15 TL
+(COMUNE DI MILANO - DIREZIONE ACQUISTI E TRANSIZIONE DIGITALE) Tj
+T* (CAPITOLATO SPECIALE D'APPALTO - CIG: B8F4920A1E) Tj
+T* (Oggetto: Servizio di Audit Cybersecurity & Penetration Testing Infrastrutture Critiche) Tj
+T* (Importo a base d'asta: EUR 65.000,00 \(IVA esclusa\) - Criterio: Minor Prezzo) Tj
+T* (--------------------------------------------------------------------------------) Tj
+T* (ART. 1 - OGGETTO E FINALITA' DELL'APPALTO) Tj
+T* (Il presente Capitolato disciplina l'affidamento dei servizi specialistici di) Tj
+T* (Vulnerability Assessment, Penetration Testing \(VAPT\) e Audit di conformita') Tj
+T* (ISO/IEC 27001:2022 sulle infrastrutture ICT e sui portali istituzionali.) Tj
+T* () Tj
+T* (ART. 2 - REQUISITI TECNICI MINIMI E ATTIVITA' RICHIESTE) Tj
+T* (1. Black-Box & Grey-Box Penetration Test su 12 applicazioni web esposte \(OWASP Top 10\).) Tj
+T* (2. Analisi infrastrutturale su cluster Kubernetes, API Gateway e firewall perimetrali.) Tj
+T* (3. Simulazione Red Team su scenari di phishing mirato e privilege escalation.) Tj
+T* (4. Rilascio Report Esecutivo, Report Tecnico dettagliato e sessione di Re-Test finale.) Tj
+T* () Tj
+T* (ART. 3 - REQUISITI DEL GRUPPO DI LAVORO) Tj
+T* (Il Fornitore dovra' impiegare personale dotato di certificazioni riconosciute) Tj
+T* (\(OSCP, OSCE3, CISSP o ISO 27001 Lead Auditor\) con esperienza minima quinquennale.) Tj
+T* () Tj
+T* (ART. 4 - TEMPISTICHE, SLA E PENALI) Tj
+T* (Durata complessiva: 90 giorni solari dalla stipula. Le vulnerabilita' critiche \(CVSS >= 9.0\)) Tj
+T* (devono essere notificate all'Ente entro 4 ore dalla scoperta tramite canale cifrato.) Tj
+T* () Tj
+T* (ART. 5 - MODALITA' DI AGGIUDICAZIONE) Tj
+T* (L'appalto sara' aggiudicato secondo il criterio del minor prezzo ai sensi del D.Lgs. 36/2023,) Tj
+T* (mediante rilanci telematici al ribasso sulla piattaforma digitale TenderFlow.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000002190 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2260
+%%EOF

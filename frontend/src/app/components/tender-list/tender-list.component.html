@@ -194,6 +194,11 @@
                   (click)="onCloseTender()">
             {{ isClosingTender() ? 'Chiusura in corso...' : 'Chiudi e Aggiudica Gara' }}
           </button>
+
+          <button class="btn btn-outline-dark btn-sm fw-semibold px-3 py-2"
+               (click)="onDownloadCsvReport(current)">
+         📥 Esporta Report CSV
+          </button>
         </div>
       </div>
 
@@ -286,6 +291,25 @@
           </tbody>
         </table>
       </div>
+      
+      <!-- Audit Trail (Solo BUYER proprietario) -->
+      <div *ngIf="isTenderOwner(current) && auditLogs().length > 0" class="mt-4">
+       <h6 class="fw-bold text-dark small mb-2">
+        🛡️ Audit Trail & Tracciabilità ({{ auditLogs().length }} eventi)
+       </h6>
+       <div class="list-group list-group-flush bg-white rounded-2 border small">
+        <div *ngFor="let log of auditLogs()" class="list-group-item d-flex justify-content-between align-items-start py-2 px-3">
+          <div>
+            <span class="badge bg-secondary-subtle text-secondary-emphasis border me-2">{{ log.action }}</span>
+            <span class="text-dark">{{ log.details }}</span>
+            <div class="text-muted" style="font-size: 0.72rem;">Eseguito da: {{ log.actorName }}</div>
+          </div>
+          <span class="text-muted text-nowrap ms-2" style="font-size: 0.72rem;">
+           {{ log.createdAt | date:'dd/MM/yyyy HH:mm:ss' }}
+          </span>
+        </div>
+       </div>
+     </div>
     </div>
   </div>
 </div>

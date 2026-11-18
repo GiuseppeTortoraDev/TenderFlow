@@ -1,5 +1,6 @@
 package com.tenderflow.service;
 
+import com.tenderflow.model.AuditLog;
 import com.tenderflow.model.Bid;
 import com.tenderflow.model.Tender;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -21,6 +22,11 @@ public class TenderLifecycleService {
 
     @Transactional
     public Bid closeAndAwardTender(Tender tender) {
+        return closeAndAwardTender(tender, tender.createdByEmail, tender.createdByName, false);
+    }
+
+    @Transactional
+    public Bid closeAndAwardTender(Tender tender, String actorEmail, String actorName, boolean automated) {
         tender.status = "CLOSED";
 
         Bid winningBid = Bid.find("tender.id = ?1 order by amount asc", tender.id).firstResult();
@@ -29,6 +35,14 @@ public class TenderLifecycleService {
             tender.winningAmount = winningBid.amount;
         }
 
+        String action = automated ? "CLOSED_SCHEDULER" : "CLOSED_MANUAL";
+        String email = automated ? "system@tenderflow.it" : actorEmail;
+        String name = automated ? "Quarkus Scheduler" : actorName;
+        String details = (winningBid != null)
+                ? String.format("Gara chiusa e aggiudicata a %s per € %s", winningBid.bidderName, winningBid.amount)
+                : "Gara chiusa senza offerte pervenute";
+
+        AuditLog.record(tender.id, action, email, name, details);
         tenderEmitter.send(tender);
         return winningBid;
     }
@@ -39,7 +53,7 @@ public class TenderLifecycleService {
         List<Tender> expiredTenders = Tender.list("status = 'OPEN' and closingDate is not null and closingDate < ?1", today);
 
         for (Tender tender : expiredTenders) {
-            Bid winner = closeAndAwardTender(tender);
+            Bid winner = closeAndAwardTender(tender, "system@tenderflow.it", "Quarkus Scheduler", true);
             if (winner != null) {
                 LOG.infof("[SCHEDULER] Gara #%d ('%s') scaduta e aggiudicata automaticamente a %s (€ %s)",
                         tender.id, tender.title, winner.bidderName, winner.amount);

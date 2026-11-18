@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
-import { Tender, TenderStats } from '../models/tender.model';
+import { AuditLogEntry, Tender, TenderStats } from '../models/tender.model';
 
 export interface TenderFilters {
   title?: string;
@@ -133,5 +133,15 @@ export class TenderService {
 
   getDocumentUrl(tenderId: number): string {
     return `${this.apiUrl}/${tenderId}/document`;
+  }
+
+  getAuditLogs(tenderId: number): Observable<AuditLogEntry[]> {
+    return this.http.get<AuditLogEntry[]>(`${this.apiUrl}/${tenderId}/audit`);
+  }
+
+  downloadCsvReport(tenderId: number): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${tenderId}/report.csv`, {
+      responseType: 'blob'
+    });
   }
 }

@@ -2,12 +2,11 @@ package com.tenderflow.controller;
 
 import com.tenderflow.dto.TenderStatsDTO;
 import com.tenderflow.exception.BusinessException;
+import com.tenderflow.model.AuditLog;
 import com.tenderflow.model.Bid;
 import com.tenderflow.model.Tender;
 import com.tenderflow.service.DocumentStorageService;
 import com.tenderflow.service.TenderLifecycleService;
-import org.jboss.resteasy.reactive.RestForm;
-import org.jboss.resteasy.reactive.multipart.FileUpload;
 import io.quarkus.panache.common.Page;
 import io.quarkus.panache.common.Parameters;
 import io.quarkus.panache.common.Sort;
@@ -31,6 +30,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.jboss.resteasy.reactive.RestForm;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -78,7 +78,6 @@ public class TenderResource {
         StringBuilder query = new StringBuilder("1=1");
         Parameters params = new Parameters();
 
-        // Le gare in DRAFT sono visibili solo al buyer che le ha create
         if (currentUserEmail != null && !currentUserEmail.isBlank()) {
             query.append(" and (status <> 'DRAFT' or createdByEmail = :currentUserEmail)");
             params.and("currentUserEmail", currentUserEmail);
@@ -141,7 +140,9 @@ public class TenderResource {
         tender.createdByName = (creatorName != null && !creatorName.isBlank()) ? creatorName : creatorEmail;
         tender.persist();
 
-        // Pubblica evento Kafka solo se la gara è effettivamente aperta al pubblico
+        AuditLog.record(tender.id, "CREATED", creatorEmail, tender.createdByName,
+                String.format("Gara creata in stato %s con budget € %s", tender.status, tender.budget));
+
         if ("OPEN".equals(tender.status)) {
             tenderEmitter.send(tender);
         }
@@ -168,6 +169,8 @@ public class TenderResource {
         }
 
         tender.status = "OPEN";
+        AuditLog.record(tender.id, "PUBLISHED", jwt.getName(), jwt.getClaim("fullName"),
+                "Gara pubblicata e aperta alle offerte");
         tenderEmitter.send(tender);
 
         return Response.ok(tender).build();
@@ -201,7 +204,7 @@ public class TenderResource {
             throw new BusinessException("La gara e' gia' stata chiusa");
         }
 
-        Bid winningBid = lifecycleService.closeAndAwardTender(tender);
+        Bid winningBid = lifecycleService.closeAndAwardTender(tender, jwt.getName(), jwt.getClaim("fullName"), false);
 
         if (winningBid == null) {
             return Response.ok()
@@ -255,6 +258,9 @@ public class TenderResource {
                 documentStorageService.deleteQuietly(previousStoredName);
             }
 
+            AuditLog.record(tender.id, "DOCUMENT_UPLOADED", jwt.getName(), jwt.getClaim("fullName"),
+                    "Capitolato PDF caricato: " + file.fileName());
+
             return Response.ok(tender).build();
         } catch (IOException e) {
             throw new BusinessException("Impossibile leggere il file caricato", Response.Status.INTERNAL_SERVER_ERROR);
@@ -280,6 +286,80 @@ public class TenderResource {
         return Response.ok(filePath.toFile(), "application/pdf")
                 .header("Content-Disposition", "inline; filename=\"" + downloadName + "\"")
                 .build();
+    }
+
+    @GET
+    @Path("/{id}/audit")
+    @RolesAllowed("BUYER")
+    @SecurityRequirement(name = "jwtAuth")
+    @Operation(summary = "Storico Audit Trail della gara (Solo BUYER creatore)", description = "Restituisce il log cronologico delle azioni eseguite sulla gara.")
+    public List<AuditLog> getTenderAuditLogs(@Parameter(description = "ID della gara") @PathParam("id") Long id) {
+        Tender tender = Tender.findById(id);
+        if (tender == null) {
+            throw new BusinessException("Gara non trovata", Response.Status.NOT_FOUND);
+        }
+        verifyOwnership(tender);
+        return AuditLog.list("tenderId = ?1 order by createdAt desc", id);
+    }
+
+    @GET
+    @Path("/{id}/report.csv")
+    @RolesAllowed("BUYER")
+    @Produces("text/csv; charset=UTF-8")
+    @SecurityRequirement(name = "jwtAuth")
+    @Operation(summary = "Esporta report gara e graduatoria in CSV (Solo BUYER creatore)")
+    public Response exportTenderCsvReport(@Parameter(description = "ID della gara") @PathParam("id") Long id) {
+        Tender tender = Tender.findById(id);
+        if (tender == null) {
+            throw new BusinessException("Gara non trovata", Response.Status.NOT_FOUND);
+        }
+        verifyOwnership(tender);
+
+        List<Bid> bids = Bid.list("tender.id = ?1 order by amount asc", id);
+        List<AuditLog> logs = AuditLog.list("tenderId = ?1 order by createdAt asc", id);
+
+        StringBuilder csv = new StringBuilder("\uFEFF");
+        csv.append("RIEPILOGO GARA D'APPALTO\n");
+        csv.append("ID;Titolo;Stato;Ente;Budget (EUR);Scadenza;Aggiudicatario;Importo Aggiudicato (EUR)\n");
+        csv.append(String.format("%d;\"%s\";%s;\"%s\";%s;%s;\"%s\";%s\n\n",
+                tender.id,
+                escapeCsv(tender.title),
+                tender.status,
+                escapeCsv(tender.createdByName),
+                tender.budget != null ? tender.budget.toPlainString() : "",
+                tender.closingDate != null ? tender.closingDate.toString() : "",
+                escapeCsv(tender.winningBidderName),
+                tender.winningAmount != null ? tender.winningAmount.toPlainString() : ""));
+
+        csv.append("GRADUATORIA OFFERTE\n");
+        csv.append("Posizione;Fornitore;Email;Importo (EUR);Data Invio\n");
+        for (int i = 0; i < bids.size(); i++) {
+            Bid b = bids.get(i);
+            csv.append(String.format("%d;\"%s\";%s;%s;%s\n",
+                    i + 1,
+                    escapeCsv(b.bidderName),
+                    b.bidderEmail != null ? b.bidderEmail : "",
+                    b.amount != null ? b.amount.toPlainString() : "",
+                    b.submissionDate != null ? b.submissionDate.toString() : ""));
+        }
+
+        csv.append("\nAUDIT TRAIL OPERAZIONI\n");
+        csv.append("Data/Ora;Azione;Utente;Dettagli\n");
+        for (AuditLog log : logs) {
+            csv.append(String.format("%s;%s;\"%s\";\"%s\"\n",
+                    log.createdAt != null ? log.createdAt.toString() : "",
+                    log.action,
+                    escapeCsv(log.actorName),
+                    escapeCsv(log.details)));
+        }
+
+        return Response.ok(csv.toString())
+                .header("Content-Disposition", "attachment; filename=\"report-gara-" + id + ".csv\"")
+                .build();
+    }
+
+    private String escapeCsv(String value) {
+        return value == null ? "" : value.replace("\"", "\"\"");
     }
 
     @GET

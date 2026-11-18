@@ -1,11 +1,13 @@
 package com.tenderflow.controller;
 
 import com.tenderflow.exception.BusinessException;
+import com.tenderflow.model.AuditLog;
 import com.tenderflow.model.Bid;
 import com.tenderflow.model.Tender;
 import io.quarkus.panache.common.Page;
 import io.quarkus.panache.common.Sort;
 import jakarta.annotation.security.RolesAllowed;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
@@ -25,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Path("/api/tenders/{tenderId}/bids")
+@ApplicationScoped
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Bid Management", description = "Sottomissione e consultazione offerte per gara")
@@ -81,9 +84,18 @@ public class BidResource {
             if (bid.amount.compareTo(existingBid.amount) >= 0) {
                 throw new BusinessException("Hai gia' inviato un'offerta di € " + existingBid.amount + ". Puoi solo migliorarla al ribasso.");
             }
+            BigDecimal previousAmount = existingBid.amount;
             existingBid.amount = bid.amount;
             existingBid.bidderName = authenticatedName;
             existingBid.submissionDate = LocalDateTime.now();
+
+            AuditLog.record(
+                    tenderId,
+                    "BID_UPDATED",
+                    authenticatedEmail,
+                    authenticatedName,
+                    String.format("Offerta migliorata al ribasso da € %s a € %s", previousAmount, bid.amount)
+            );
 
             bidEmitter.send(existingBid);
             return Response.ok(existingBid).build();
@@ -94,6 +106,14 @@ public class BidResource {
         bid.tender = tender;
         bid.submissionDate = LocalDateTime.now();
         bid.persist();
+
+        AuditLog.record(
+                tenderId,
+                "BID_SUBMITTED",
+                authenticatedEmail,
+                authenticatedName,
+                String.format("Nuova offerta economica presentata di € %s", bid.amount)
+        );
 
         bidEmitter.send(bid);
 

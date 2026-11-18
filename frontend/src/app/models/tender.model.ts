@@ -30,3 +30,13 @@ export interface TenderStats {
   averageSavingsPercentage: number;
   topSuppliers: TopSupplier[];
 }
+
+export interface AuditLogEntry {
+  id: number;
+  tenderId: number;
+  action: string;
+  actorEmail: string;
+  actorName: string;
+  details: string;
+  createdAt: string;
+}
