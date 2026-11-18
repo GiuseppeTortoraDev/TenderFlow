@@ -20,6 +20,10 @@ public class Tender extends PanacheEntity {
     public String winningBidderName;
     public BigDecimal winningAmount;
 
+    // Metadati Capitolato Tecnico PDF
+    public String documentOriginalName;
+    public String documentStoredName;
+
     public Tender() {
     }
 }

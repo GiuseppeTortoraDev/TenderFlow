@@ -3,7 +3,10 @@ package com.tenderflow.controller;
 import com.tenderflow.exception.BusinessException;
 import com.tenderflow.model.Bid;
 import com.tenderflow.model.Tender;
+import com.tenderflow.service.DocumentStorageService;
 import com.tenderflow.service.TenderLifecycleService;
+import org.jboss.resteasy.reactive.RestForm;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
 import io.quarkus.panache.common.Page;
 import io.quarkus.panache.common.Parameters;
 import io.quarkus.panache.common.Sort;
@@ -26,8 +29,12 @@ import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
+import org.jboss.resteasy.reactive.RestForm;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.file.Files;
 import java.util.List;
 
 @Path("/api/tenders")
@@ -42,6 +49,8 @@ public class TenderResource {
     JsonWebToken jwt;
     @Inject
     TenderLifecycleService lifecycleService;
+    @Inject
+    DocumentStorageService documentStorageService;
 
     @Channel("tender-events-out")
     Emitter<Tender> tenderEmitter;
@@ -206,4 +215,65 @@ public class TenderResource {
     }
 
     public record TenderAwardResult(Tender tender, Bid winningBid) {}
+
+    @POST
+    @Path("/{id}/document")
+    @RolesAllowed("BUYER")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Transactional
+    @SecurityRequirement(name = "jwtAuth")
+    @Operation(summary = "Carica capitolato tecnico PDF (Solo BUYER creatore)", description = "Allega o sostituisce un documento PDF (max 10 MB) alla gara.")
+    public Response uploadDocument(
+            @Parameter(description = "ID della gara") @PathParam("id") Long id,
+            @RestForm("file") FileUpload file) {
+
+        Tender tender = Tender.findById(id);
+        if (tender == null) {
+            throw new BusinessException("Gara non trovata", Response.Status.NOT_FOUND);
+        }
+
+        verifyOwnership(tender);
+
+        if (file == null || file.uploadedFile() == null) {
+            throw new BusinessException("Seleziona un file PDF da caricare");
+        }
+
+        try (InputStream is = Files.newInputStream(file.uploadedFile())) {
+            String previousStoredName = tender.documentStoredName;
+            String newStoredName = documentStorageService.storePdf(id, file.fileName(), is);
+
+            tender.documentOriginalName = file.fileName();
+            tender.documentStoredName = newStoredName;
+
+            if (previousStoredName != null) {
+                documentStorageService.deleteQuietly(previousStoredName);
+            }
+
+            return Response.ok(tender).build();
+        } catch (IOException e) {
+            throw new BusinessException("Impossibile leggere il file caricato", Response.Status.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @GET
+    @Path("/{id}/document")
+    @PermitAll
+    @Produces("application/pdf")
+    @Operation(summary = "Scarica o visualizza il capitolato tecnico PDF", description = "Restituisce il PDF allegato alla gara se presente.")
+    public Response downloadDocument(@Parameter(description = "ID della gara") @PathParam("id") Long id) {
+        Tender tender = Tender.findById(id);
+        if (tender == null) {
+            throw new BusinessException("Gara non trovata", Response.Status.NOT_FOUND);
+        }
+
+        java.nio.file.Path filePath = documentStorageService.resolveDocumentPath(tender.documentStoredName);
+        String downloadName = (tender.documentOriginalName != null && !tender.documentOriginalName.isBlank())
+                ? tender.documentOriginalName.replace("\"", "")
+                : "capitolato-gara-" + id + ".pdf";
+
+        return Response.ok(filePath.toFile(), "application/pdf")
+                .header("Content-Disposition", "inline; filename=\"" + downloadName + "\"")
+                .build();
+    }
 }

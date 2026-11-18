@@ -229,4 +229,57 @@ public class TenderResourceTest {
                 .body("[0].id", is(tenderId))
                 .body("[0].status", is("CLOSED"));
     }
+
+    @Test
+    public void testUploadAndDownloadTenderPdfDocument() {
+        String tenderJson = """
+            {
+                "title": "Gara Infrastruttura Cloud",
+                "description": "Gara con capitolato PDF",
+                "budget": 90000.00,
+                "closingDate": "2026-12-31",
+                "status": "OPEN"
+            }
+            """;
+
+        Integer tenderId = given()
+                .auth().oauth2(buyerToken)
+                .contentType(ContentType.JSON)
+                .body(tenderJson)
+                .when()
+                .post("/api/tenders")
+                .then()
+                .statusCode(201)
+                .extract()
+                .path("id");
+
+        byte[] fakePdfBytes = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+
+        // Altro buyer non può caricare il capitolato -> 403 Forbidden
+        given()
+                .auth().oauth2(otherBuyerToken)
+                .multiPart("file", "capitolato-abusivo.pdf", fakePdfBytes, "application/pdf")
+                .when()
+                .post("/api/tenders/" + tenderId + "/document")
+                .then()
+                .statusCode(403);
+
+        // Buyer proprietario carica il capitolato PDF -> 200 OK
+        given()
+                .auth().oauth2(buyerToken)
+                .multiPart("file", "capitolato-tecnico.pdf", fakePdfBytes, "application/pdf")
+                .when()
+                .post("/api/tenders/" + tenderId + "/document")
+                .then()
+                .statusCode(200)
+                .body("documentOriginalName", is("capitolato-tecnico.pdf"));
+
+        // Download del PDF -> 200 OK application/pdf
+        given()
+                .when()
+                .get("/api/tenders/" + tenderId + "/document")
+                .then()
+                .statusCode(200)
+                .contentType("application/pdf");
+    }
 }

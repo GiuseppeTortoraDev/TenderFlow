@@ -45,10 +45,11 @@ export class TenderListComponent implements OnInit {
   isSubmittingBid = signal<boolean>(false);
   actionFeedback = signal<{ type: 'success' | 'danger'; text: string } | null>(null);
 
-  // Stato pubblicazione / aggiudicazione (BUYER)
+  // Stato pubblicazione / aggiudicazione / upload (BUYER)
   isPublishingTender = signal<boolean>(false);
   isClosingTender = signal<boolean>(false);
   awardResult = signal<TenderAwardResult | null>(null);
+  uploadingTenderId = signal<number | null>(null);
 
   constructor() {
     effect(() => {
@@ -218,6 +219,44 @@ export class TenderListComponent implements OnInit {
           type: 'danger',
           text: err.error?.message || 'Errore durante la chiusura della gara.'
         });
+      }
+    });
+  }
+
+  getDocumentUrl(tenderId: number): string {
+    return this.tenderService.getDocumentUrl(tenderId);
+  }
+
+  onDocumentSelected(event: Event, tender: Tender): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0 || !tender.id) {
+      return;
+    }
+
+    const file = input.files[0];
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Seleziona esclusivamente un file in formato PDF (.pdf).');
+      input.value = '';
+      return;
+    }
+
+    this.uploadingTenderId.set(tender.id);
+    this.tenderService.uploadDocument(tender.id, file).subscribe({
+      next: (updatedTender) => {
+        this.uploadingTenderId.set(null);
+        input.value = '';
+        this.tenderService.tenders.update((list: Tender[]) =>
+          list.map((t: Tender) => (t.id === updatedTender.id ? updatedTender : t))
+        );
+        if (this.selectedTender()?.id === updatedTender.id) {
+          this.selectedTender.set(updatedTender);
+        }
+      },
+      error: (err) => {
+        this.uploadingTenderId.set(null);
+        input.value = '';
+        const msg = err.error?.message || 'Errore durante il caricamento del capitolato PDF';
+        alert(msg);
       }
     });
   }

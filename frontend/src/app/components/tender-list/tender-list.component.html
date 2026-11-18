@@ -84,6 +84,31 @@
               </div>
               <div class="text-secondary text-truncate" style="max-width: 280px;">{{ tender.description }}</div>
               <div *ngIf="tender.createdByName" class="text-muted" style="font-size: 0.72rem;">Ente: {{ tender.createdByName }}</div>
+
+              <!-- Capitolato Tecnico PDF -->
+              <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
+                <a *ngIf="tender.documentOriginalName && tender.id"
+                   [href]="getDocumentUrl(tender.id)"
+                   target="_blank"
+                   rel="noopener"
+                   class="badge bg-info-subtle text-info-emphasis border border-info-subtle text-decoration-none">
+                  📄 {{ tender.documentOriginalName }}
+                </a>
+
+                <label *ngIf="isTenderOwner(tender) && tender.status !== 'CLOSED'"
+                       class="btn btn-outline-secondary btn-sm py-0 px-2"
+                       style="font-size: 0.72rem; cursor: pointer;">
+                  <span *ngIf="uploadingTenderId() === tender.id">Caricamento...</span>
+                  <span *ngIf="uploadingTenderId() !== tender.id">
+                    {{ tender.documentOriginalName ? 'Sostituisci PDF' : '+ Allega Capitolato PDF' }}
+                  </span>
+                  <input type="file"
+                         accept="application/pdf,.pdf"
+                         class="d-none"
+                         (change)="onDocumentSelected($event, tender)" />
+                </label>
+              </div>
+
               <div *ngIf="tender.status === 'CLOSED' && tender.winningBidderName" class="mt-1">
                 <span class="badge bg-success-subtle text-success border border-success-subtle">
                   Aggiudicata a {{ tender.winningBidderName }} ({{ tender.winningAmount | currency:'EUR':'symbol':'1.2-2' }})
@@ -141,7 +166,17 @@
             Gara #{{ current.id }} <span *ngIf="current.createdByName">• Pubblicata da {{ current.createdByName }}</span>
           </span>
           <h5 class="fw-bold text-dark mb-1">{{ current.title }}</h5>
-          <p class="text-secondary small mb-0">{{ current.description }}</p>
+          <p class="text-secondary small mb-2">{{ current.description }}</p>
+
+          <!-- Link diretto al Capitolato nel dettaglio -->
+          <div *ngIf="current.documentOriginalName && current.id">
+            <a [href]="getDocumentUrl(current.id)"
+               target="_blank"
+               rel="noopener"
+               class="btn btn-outline-info btn-sm fw-semibold">
+              📄 Apri Capitolato Tecnico ({{ current.documentOriginalName }})
+            </a>
+          </div>
         </div>
 
         <!-- Pulsanti BUYER proprietario -->

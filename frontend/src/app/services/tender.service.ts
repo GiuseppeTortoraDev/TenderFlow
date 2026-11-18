@@ -104,4 +104,14 @@ export class TenderService {
       })
     );
   }
+
+  uploadDocument(tenderId: number, file: File): Observable<Tender> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<Tender>(`${this.apiUrl}/${tenderId}/document`, formData);
+  }
+
+  getDocumentUrl(tenderId: number): string {
+    return `${this.apiUrl}/${tenderId}/document`;
+  }
 }

@@ -57,6 +57,8 @@ services:
       QUARKUS_DATASOURCE_USERNAME: tenderflow_user
       QUARKUS_DATASOURCE_PASSWORD: tenderflow_password
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    volumes:
+      - uploads_data:/deployments/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,3 +78,4 @@ services:
 volumes:
   postgres_data:
   kafka_data:
+  uploads_data:

@@ -9,4 +9,5 @@ export interface Tender {
   createdByName?: string;
   winningBidderName?: string;
   winningAmount?: number;
+  documentOriginalName?: string;
 }

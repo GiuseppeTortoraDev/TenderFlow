@@ -1,3 +1,6 @@
 
 contesto*.txt
 stato_progetto.txt
+
+# Documenti PDF caricati in locale
+backend/uploads/
