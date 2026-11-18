@@ -7,4 +7,6 @@ export interface Tender {
   status: 'DRAFT' | 'OPEN' | 'CLOSED' | 'AWARDED';
   createdByEmail?: string;
   createdByName?: string;
+  winningBidderName?: string;
+  winningAmount?: number;
 }

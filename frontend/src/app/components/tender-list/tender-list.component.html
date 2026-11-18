@@ -84,6 +84,11 @@
               </div>
               <div class="text-secondary text-truncate" style="max-width: 280px;">{{ tender.description }}</div>
               <div *ngIf="tender.createdByName" class="text-muted" style="font-size: 0.72rem;">Ente: {{ tender.createdByName }}</div>
+              <div *ngIf="tender.status === 'CLOSED' && tender.winningBidderName" class="mt-1">
+                <span class="badge bg-success-subtle text-success border border-success-subtle">
+                  Aggiudicata a {{ tender.winningBidderName }} ({{ tender.winningAmount | currency:'EUR':'symbol':'1.2-2' }})
+                </span>
+              </div>
             </td>
             <td class="text-muted">{{ tender.closingDate || '—' }}</td>
             <td class="text-end fw-bold text-dark">

@@ -3,11 +3,13 @@ package com.tenderflow.controller;
 import com.tenderflow.exception.BusinessException;
 import com.tenderflow.model.Bid;
 import com.tenderflow.model.Tender;
+import com.tenderflow.service.TenderLifecycleService;
 import io.quarkus.panache.common.Page;
 import io.quarkus.panache.common.Parameters;
 import io.quarkus.panache.common.Sort;
 import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
@@ -29,6 +31,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @Path("/api/tenders")
+@ApplicationScoped
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "Tender Management", description = "Operazioni di gestione, ricerca e aggiudicazione delle gare d'appalto")
@@ -37,6 +40,8 @@ public class TenderResource {
 
     @Inject
     JsonWebToken jwt;
+    @Inject
+    TenderLifecycleService lifecycleService;
 
     @Channel("tender-events-out")
     Emitter<Tender> tenderEmitter;
@@ -182,10 +187,7 @@ public class TenderResource {
             throw new BusinessException("La gara e' gia' stata chiusa");
         }
 
-        tender.status = "CLOSED";
-        tenderEmitter.send(tender);
-
-        Bid winningBid = Bid.find("tender.id = ?1 order by amount asc", id).firstResult();
+        Bid winningBid = lifecycleService.closeAndAwardTender(tender);
 
         if (winningBid == null) {
             return Response.ok()

@@ -1,8 +1,10 @@
 package com.tenderflow;
 
+import com.tenderflow.service.TenderLifecycleService;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.smallrye.jwt.build.Jwt;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -11,9 +13,13 @@ import java.util.Set;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusTest
 public class TenderResourceTest {
+
+    @Inject
+    TenderLifecycleService lifecycleService;
 
     private static String buyerToken;
     private static String otherBuyerToken;
@@ -186,5 +192,41 @@ public class TenderResourceTest {
                 .statusCode(200)
                 .body("winningBid.bidderName", is("Supplier Test SpA"))
                 .body("winningBid.amount", is(42000.0f));
+    }
+
+    @Test
+    public void testSchedulerClosesExpiredTenders() {
+        String expiredTenderJson = """
+            {
+                "title": "Gara Manutenzione Scaduta",
+                "description": "Test chiusura automatica scheduler",
+                "budget": 20000.00,
+                "closingDate": "2020-01-01",
+                "status": "OPEN"
+            }
+            """;
+
+        Integer tenderId = given()
+                .auth().oauth2(buyerToken)
+                .contentType(ContentType.JSON)
+                .body(expiredTenderJson)
+                .when()
+                .post("/api/tenders")
+                .then()
+                .statusCode(201)
+                .extract()
+                .path("id");
+
+        int closed = lifecycleService.closeExpiredTenders();
+        assertTrue(closed >= 1);
+
+        given()
+                .queryParam("title", "Gara Manutenzione Scaduta")
+                .when()
+                .get("/api/tenders")
+                .then()
+                .statusCode(200)
+                .body("[0].id", is(tenderId))
+                .body("[0].status", is("CLOSED"));
     }
 }

@@ -17,6 +17,8 @@ public class Tender extends PanacheEntity {
     public String status; // "DRAFT", "OPEN", "CLOSED"
     public String createdByEmail;
     public String createdByName;
+    public String winningBidderName;
+    public BigDecimal winningAmount;
 
     public Tender() {
     }
