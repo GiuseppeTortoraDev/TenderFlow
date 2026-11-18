@@ -19,7 +19,7 @@ export interface TenderFilters {
 })
 export class TenderService {
   private http = inject(HttpClient);
-  private readonly apiUrl = 'http://localhost:8081/api/tenders';
+  private readonly apiUrl = 'api/tenders';
 
   tenders = signal<Tender[]>([]);
   isLoading = signal<boolean>(false);

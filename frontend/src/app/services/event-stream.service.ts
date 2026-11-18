@@ -12,13 +12,13 @@ export interface LiveEvent {
 })
 export class EventStreamService implements OnDestroy {
   private eventSource: EventSource | null = null;
-  private readonly streamUrl = 'http://localhost:8081/api/events/stream';
+  private readonly streamUrl = '/api/events/stream';
 
   isConnected = signal<boolean>(false);
   latestNotification = signal<LiveEvent | null>(null);
 
   connect(onEventCallback?: (event: LiveEvent) => void): void {
-    if (this.eventSource) {
+    if (this.eventSource || typeof EventSource === 'undefined') {
       return;
     }
 

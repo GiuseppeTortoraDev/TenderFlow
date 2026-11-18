@@ -8,7 +8,7 @@ import { Bid } from '../models/bid.model';
 })
 export class BidService {
   private http = inject(HttpClient);
-  private readonly baseUrl = 'http://localhost:8081/api/tenders';
+  private readonly baseUrl = '/api/tenders';
 
   getBidsForTender(tenderId: number): Observable<Bid[]> {
     return this.http.get<Bid[]>(`${this.baseUrl}/${tenderId}/bids?sortBy=amount&sortOrder=asc`);

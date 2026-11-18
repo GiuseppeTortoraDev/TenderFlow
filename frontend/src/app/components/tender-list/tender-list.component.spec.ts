@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TenderListComponent } from './tender-list.component';
 
 describe('TenderListComponent', () => {
@@ -8,6 +10,7 @@ describe('TenderListComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [TenderListComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting()]
     }).compileComponents();
 
     fixture = TestBed.createComponent(TenderListComponent);

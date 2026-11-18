@@ -14,7 +14,7 @@ export interface AuthResponse {
 })
 export class AuthService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8081/api/auth';
+  private apiUrl = '/api/auth';
 
   // Signal reattivo per lo stato dell'utente loggato
   currentUser = signal<AuthResponse | null>(this.loadUserFromStorage());
