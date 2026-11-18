@@ -14,10 +14,10 @@ public class Tender extends PanacheEntity {
     public String description;
     public BigDecimal budget;
     public LocalDate closingDate;
-    public String status; // es. "OPEN", "CLOSED"
+    public String status; // "DRAFT", "OPEN", "CLOSED"
+    public String createdByEmail;
+    public String createdByName;
 
     public Tender() {
     }
 }
-
-

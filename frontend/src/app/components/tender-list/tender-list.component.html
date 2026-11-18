@@ -21,7 +21,7 @@
         <select class="form-select form-select-sm" [(ngModel)]="filterStatus" name="filterStatus">
           <option value="">Tutti</option>
           <option value="OPEN">OPEN</option>
-          <option value="DRAFT">DRAFT</option>
+          <option value="DRAFT">DRAFT (Mie)</option>
           <option value="CLOSED">CLOSED</option>
         </select>
       </div>
@@ -67,7 +67,7 @@
         <thead class="table-light">
           <tr>
             <th scope="col" style="width: 65px;">ID</th>
-            <th scope="col">Titolo Gara</th>
+            <th scope="col">Titolo Gara / Ente</th>
             <th scope="col">Scadenza</th>
             <th scope="col" class="text-end">Budget (€)</th>
             <th scope="col" class="text-center" style="width: 110px;">Stato</th>
@@ -78,8 +78,12 @@
           <tr *ngFor="let tender of tenderService.tenders()" [class.table-active]="selectedTender()?.id === tender.id">
             <td class="fw-bold text-muted">#{{ tender.id }}</td>
             <td>
-              <div class="fw-semibold text-dark">{{ tender.title }}</div>
+              <div class="fw-semibold text-dark">
+                {{ tender.title }}
+                <span *ngIf="isTenderOwner(tender)" class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1">Tua Gara</span>
+              </div>
               <div class="text-secondary text-truncate" style="max-width: 280px;">{{ tender.description }}</div>
+              <div *ngIf="tender.createdByName" class="text-muted" style="font-size: 0.72rem;">Ente: {{ tender.createdByName }}</div>
             </td>
             <td class="text-muted">{{ tender.closingDate || '—' }}</td>
             <td class="text-end fw-bold text-dark">
@@ -128,14 +132,24 @@
     <div *ngIf="selectedTender() as current" class="mt-4 p-4 bg-light rounded-3 border">
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
-          <span class="text-uppercase text-muted fw-bold" style="font-size: 0.72rem;">Gara #{{ current.id }}</span>
+          <span class="text-uppercase text-muted fw-bold" style="font-size: 0.72rem;">
+            Gara #{{ current.id }} <span *ngIf="current.createdByName">• Pubblicata da {{ current.createdByName }}</span>
+          </span>
           <h5 class="fw-bold text-dark mb-1">{{ current.title }}</h5>
           <p class="text-secondary small mb-0">{{ current.description }}</p>
         </div>
 
-        <!-- Pulsante BUYER: Chiudi e Aggiudica -->
-        <div *ngIf="authService.userRole() === 'BUYER' && current.status === 'OPEN'">
-          <button class="btn btn-danger btn-sm fw-semibold px-3 py-2"
+        <!-- Pulsanti BUYER proprietario -->
+        <div *ngIf="isTenderOwner(current)" class="d-flex gap-2">
+          <button *ngIf="current.status === 'DRAFT'"
+                  class="btn btn-success btn-sm fw-semibold px-3 py-2"
+                  [disabled]="isPublishingTender()"
+                  (click)="onPublishTender()">
+            {{ isPublishingTender() ? 'Pubblicazione...' : 'Pubblica Gara (OPEN)' }}
+          </button>
+
+          <button *ngIf="current.status === 'OPEN'"
+                  class="btn btn-danger btn-sm fw-semibold px-3 py-2"
                   [disabled]="isClosingTender()"
                   (click)="onCloseTender()">
             {{ isClosingTender() ? 'Chiusura in corso...' : 'Chiudi e Aggiudica Gara' }}
@@ -148,10 +162,17 @@
         {{ fb.text }}
       </div>
 
-      <!-- Form SUPPLIER: Invio Offerta -->
+      <!-- Form SUPPLIER: Invio / Rilancio Offerta -->
       <div *ngIf="authService.userRole() === 'SUPPLIER' && current.status === 'OPEN'" class="card border-0 shadow-sm mb-3">
         <div class="card-body p-3">
-          <h6 class="fw-bold text-dark small mb-2">Invia la tua Offerta Economica</h6>
+          <h6 class="fw-bold text-dark small mb-2">
+            {{ myCurrentBid() ? 'Migliora la tua Offerta al Ribasso' : 'Invia la tua Offerta Economica' }}
+          </h6>
+
+          <div *ngIf="myCurrentBid() as existing" class="alert alert-warning py-1 px-2 small mb-2">
+            La tua offerta attuale è di <strong>{{ existing.amount | currency:'EUR':'symbol':'1.2-2' }}</strong>. Inserisci un importo inferiore per rilanciare.
+          </div>
+
           <form (ngSubmit)="onSubmitBid()" #bidForm="ngForm" class="row g-2 align-items-center">
             <div class="col-sm-6 col-md-5">
               <div class="input-group input-group-sm">
@@ -162,7 +183,7 @@
                        name="bidAmount"
                        placeholder="Importo offerta"
                        min="1"
-                       [max]="current.budget"
+                       [max]="myCurrentBid() ? (myCurrentBid()!.amount - 0.01) : current.budget"
                        step="0.01"
                        required />
               </div>
@@ -171,7 +192,7 @@
               <button type="submit"
                       class="btn btn-success btn-sm fw-semibold px-3"
                       [disabled]="!bidForm.form.valid || isSubmittingBid()">
-                {{ isSubmittingBid() ? 'Invio...' : 'Sottometti Offerta' }}
+                {{ isSubmittingBid() ? 'Invio...' : (myCurrentBid() ? 'Aggiorna Offerta' : 'Sottometti Offerta') }}
               </button>
             </div>
             <div class="col-12">
@@ -213,7 +234,10 @@
                   {{ current.status === 'CLOSED' ? 'VINCITORE' : 'MIGLIORE' }}
                 </span>
               </td>
-              <td class="fw-semibold text-dark">{{ bid.bidderName }}</td>
+              <td class="fw-semibold text-dark">
+                {{ bid.bidderName }}
+                <span *ngIf="bid.bidderEmail === authService.currentUser()?.email" class="badge bg-info text-dark ms-1">Tu</span>
+              </td>
               <td class="text-muted">{{ bid.submissionDate | date:'dd/MM/yyyy HH:mm' }}</td>
               <td class="text-end pe-3 fw-bold text-dark">
                 {{ bid.amount | currency:'EUR':'symbol':'1.2-2' }}

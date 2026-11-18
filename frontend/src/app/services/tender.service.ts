@@ -80,8 +80,17 @@ export class TenderService {
   createTender(tender: Tender): Observable<Tender> {
     return this.http.post<Tender>(this.apiUrl, tender).pipe(
       tap(() => {
-        // Ricarica la prima pagina rispettando i filtri e l'ordinamento correnti
         this.loadTenders({ page: 0 });
+      })
+    );
+  }
+
+  publishTender(id: number): Observable<Tender> {
+    return this.http.put<Tender>(`${this.apiUrl}/${id}/publish`, {}).pipe(
+      tap((updated) => {
+        this.tenders.update((current) =>
+          current.map((t) => (t.id === id ? updated : t))
+        );
       })
     );
   }

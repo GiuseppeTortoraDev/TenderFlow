@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, effect } from '@angular/core';
+import { Component, OnInit, inject, signal, effect, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TenderService } from '../../services/tender.service';
@@ -33,17 +33,24 @@ export class TenderListComponent implements OnInit {
   bids = signal<Bid[]>([]);
   isLoadingBids = signal<boolean>(false);
 
+  // Eventuale offerta già inviata dal SUPPLIER corrente
+  myCurrentBid = computed(() => {
+    const email = this.authService.currentUser()?.email;
+    if (!email) return null;
+    return this.bids().find((b) => b.bidderEmail?.toLowerCase() === email.toLowerCase()) ?? null;
+  });
+
   // Stato form offerta (SUPPLIER)
   bidAmount: number | null = null;
   isSubmittingBid = signal<boolean>(false);
   actionFeedback = signal<{ type: 'success' | 'danger'; text: string } | null>(null);
 
-  // Stato aggiudicazione (BUYER)
+  // Stato pubblicazione / aggiudicazione (BUYER)
+  isPublishingTender = signal<boolean>(false);
   isClosingTender = signal<boolean>(false);
   awardResult = signal<TenderAwardResult | null>(null);
 
   constructor() {
-    // Se arriva un evento BID_EVENT via Kafka SSE per la gara aperta, aggiorna le offerte in diretta
     effect(() => {
       const notif = this.eventStream.latestNotification();
       const current = this.selectedTender();
@@ -55,6 +62,14 @@ export class TenderListComponent implements OnInit {
 
   ngOnInit(): void {
     this.tenderService.loadTenders();
+  }
+
+  isTenderOwner(tender: Tender): boolean {
+    const userEmail = this.authService.currentUser()?.email;
+    if (!userEmail || this.authService.userRole() !== 'BUYER') {
+      return false;
+    }
+    return !tender.createdByEmail || tender.createdByEmail.toLowerCase() === userEmail.toLowerCase();
   }
 
   applyFilters(): void {
@@ -124,6 +139,7 @@ export class TenderListComponent implements OnInit {
       return;
     }
 
+    const wasUpdate = this.myCurrentBid() !== null;
     this.isSubmittingBid.set(true);
     this.actionFeedback.set(null);
 
@@ -133,7 +149,7 @@ export class TenderListComponent implements OnInit {
         this.bidAmount = null;
         this.actionFeedback.set({
           type: 'success',
-          text: 'Offerta inviata con successo!'
+          text: wasUpdate ? 'Offerta migliorata al ribasso con successo!' : 'Offerta inviata con successo!'
         });
         this.loadBids(tender.id!);
       },
@@ -142,6 +158,34 @@ export class TenderListComponent implements OnInit {
         this.actionFeedback.set({
           type: 'danger',
           text: err.error?.message || 'Errore durante l\'invio dell\'offerta.'
+        });
+      }
+    });
+  }
+
+  onPublishTender(): void {
+    const tender = this.selectedTender();
+    if (!tender?.id) {
+      return;
+    }
+
+    this.isPublishingTender.set(true);
+    this.actionFeedback.set(null);
+
+    this.tenderService.publishTender(tender.id).subscribe({
+      next: (updated) => {
+        this.isPublishingTender.set(false);
+        this.selectedTender.set(updated);
+        this.actionFeedback.set({
+          type: 'success',
+          text: 'Gara pubblicata con successo! Ora i fornitori possono inviare offerte.'
+        });
+      },
+      error: (err) => {
+        this.isPublishingTender.set(false);
+        this.actionFeedback.set({
+          type: 'danger',
+          text: err.error?.message || 'Errore durante la pubblicazione della gara.'
         });
       }
     });

@@ -40,7 +40,7 @@ public class BidResource {
     @RolesAllowed("SUPPLIER")
     @Transactional
     @SecurityRequirement(name = "jwtAuth")
-    @Operation(summary = "Invia offerta (Solo SUPPLIER)", description = "Richiede il ruolo SUPPLIER per sottomettere un'offerta.")
+    @Operation(summary = "Invia o aggiorna al ribasso un'offerta (Solo SUPPLIER)", description = "Richiede il ruolo SUPPLIER.")
     public Response createBid(
             @Parameter(description = "ID della gara") @PathParam("tenderId") Long tenderId,
             Bid bid) {
@@ -66,11 +66,30 @@ public class BidResource {
             throw new BusinessException("L'importo dell'offerta supera il budget massimo della gara");
         }
 
+        String authenticatedEmail = jwt.getName();
         String authenticatedName = jwt.getClaim("fullName");
         if (authenticatedName == null || authenticatedName.isBlank()) {
-            authenticatedName = jwt.getName() != null ? jwt.getName() : bid.bidderName;
+            authenticatedName = authenticatedEmail != null ? authenticatedEmail : bid.bidderName;
         }
 
+        // Verifica se il fornitore ha già inviato un'offerta su questa gara
+        Bid existingBid = (authenticatedEmail != null)
+                ? Bid.find("tender.id = ?1 and bidderEmail = ?2", tenderId, authenticatedEmail).firstResult()
+                : null;
+
+        if (existingBid != null) {
+            if (bid.amount.compareTo(existingBid.amount) >= 0) {
+                throw new BusinessException("Hai gia' inviato un'offerta di € " + existingBid.amount + ". Puoi solo migliorarla al ribasso.");
+            }
+            existingBid.amount = bid.amount;
+            existingBid.bidderName = authenticatedName;
+            existingBid.submissionDate = LocalDateTime.now();
+
+            bidEmitter.send(existingBid);
+            return Response.ok(existingBid).build();
+        }
+
+        bid.bidderEmail = authenticatedEmail;
         bid.bidderName = authenticatedName;
         bid.tender = tender;
         bid.submissionDate = LocalDateTime.now();

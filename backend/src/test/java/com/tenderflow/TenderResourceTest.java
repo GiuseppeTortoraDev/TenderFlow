@@ -16,6 +16,7 @@ import static org.hamcrest.CoreMatchers.notNullValue;
 public class TenderResourceTest {
 
     private static String buyerToken;
+    private static String otherBuyerToken;
     private static String supplierToken;
 
     @BeforeAll
@@ -24,6 +25,13 @@ public class TenderResourceTest {
                 .upn("buyer@tenderflow.it")
                 .groups(Set.of("BUYER"))
                 .claim("fullName", "Buyer Test Srl")
+                .expiresIn(3600)
+                .sign();
+
+        otherBuyerToken = Jwt.issuer("https://tenderflow.it/issuer")
+                .upn("altro-buyer@tenderflow.it")
+                .groups(Set.of("BUYER"))
+                .claim("fullName", "Altro Ente SpA")
                 .expiresIn(3600)
                 .sign();
 
@@ -45,7 +53,6 @@ public class TenderResourceTest {
             }
             """;
 
-        // Tentativo senza header Authorization -> 401 Unauthorized
         given()
                 .contentType(ContentType.JSON)
                 .body(tenderJson)
@@ -57,7 +64,6 @@ public class TenderResourceTest {
 
     @Test
     public void testGlobalExceptionMapperErrorFormat() {
-        // Chiusura di una gara inesistente (ID 999999) -> Verifica che la risposta segua la struttura ErrorResponse
         given()
                 .auth().oauth2(buyerToken)
                 .contentType(ContentType.JSON)
@@ -72,14 +78,14 @@ public class TenderResourceTest {
     }
 
     @Test
-    public void testRoleAccessAndCompleteLifecycle() {
-        String tenderJson = """
+    public void testRoleAccessOwnershipAndCompleteLifecycle() {
+        String draftTenderJson = """
             {
                 "title": "Gara Cyber Security",
                 "description": "Fornitura SOC Managed",
                 "budget": 60000.00,
                 "closingDate": "2026-12-31",
-                "status": "OPEN"
+                "status": "DRAFT"
             }
             """;
 
@@ -87,75 +93,98 @@ public class TenderResourceTest {
         given()
                 .auth().oauth2(supplierToken)
                 .contentType(ContentType.JSON)
-                .body(tenderJson)
+                .body(draftTenderJson)
                 .when()
                 .post("/api/tenders")
                 .then()
                 .statusCode(403);
 
-        // 2. BUYER crea la gara -> 201 Created
+        // 2. BUYER crea la gara in bozza (DRAFT) -> 201 Created
         Integer tenderId = given()
                 .auth().oauth2(buyerToken)
                 .contentType(ContentType.JSON)
-                .body(tenderJson)
+                .body(draftTenderJson)
                 .when()
                 .post("/api/tenders")
                 .then()
                 .statusCode(201)
                 .body("id", notNullValue())
+                .body("status", is("DRAFT"))
+                .body("createdByEmail", is("buyer@tenderflow.it"))
                 .extract()
                 .path("id");
 
-        // 3. BUYER tenta di inviare un'offerta -> 403 Forbidden
-        String bidJson = """
-            {
-                "bidderName": "Buyer Corp",
-                "amount": 40000.00
-            }
-            """;
-
+        // 3. Altro BUYER tenta di pubblicare la gara non sua -> 403 Forbidden
         given()
-                .auth().oauth2(buyerToken)
-                .contentType(ContentType.JSON)
-                .body(bidJson)
+                .auth().oauth2(otherBuyerToken)
                 .when()
-                .post("/api/tenders/" + tenderId + "/bids")
+                .put("/api/tenders/" + tenderId + "/publish")
                 .then()
                 .statusCode(403);
 
-        // 4. SUPPLIER invia un'offerta valida -> 201 Created
-        String validBidJson = """
-            {
-                "bidderName": "SecureTech SpA",
-                "amount": 45000.00
-            }
-            """;
+        // 4. BUYER creatore pubblica la gara (DRAFT -> OPEN) -> 200 OK
+        given()
+                .auth().oauth2(buyerToken)
+                .when()
+                .put("/api/tenders/" + tenderId + "/publish")
+                .then()
+                .statusCode(200)
+                .body("status", is("OPEN"));
 
+        // 5. SUPPLIER invia prima offerta valida -> 201 Created
         given()
                 .auth().oauth2(supplierToken)
                 .contentType(ContentType.JSON)
-                .body(validBidJson)
+                .body("""
+                    { "amount": 45000.00 }
+                    """)
                 .when()
                 .post("/api/tenders/" + tenderId + "/bids")
                 .then()
                 .statusCode(201)
-                .body("bidderName", is("SecureTech SpA"));
+                .body("bidderName", is("Supplier Test SpA"));
 
-        // 5. SUPPLIER tenta di chiudere la gara -> 403 Forbidden
+        // 6. SUPPLIER tenta offerta peggiorativa -> 400 Bad Request
         given()
                 .auth().oauth2(supplierToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                    { "amount": 48000.00 }
+                    """)
+                .when()
+                .post("/api/tenders/" + tenderId + "/bids")
+                .then()
+                .statusCode(400);
+
+        // 7. SUPPLIER migliora l'offerta al ribasso -> 200 OK
+        given()
+                .auth().oauth2(supplierToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                    { "amount": 42000.00 }
+                    """)
+                .when()
+                .post("/api/tenders/" + tenderId + "/bids")
+                .then()
+                .statusCode(200)
+                .body("amount", is(42000.0f));
+
+        // 8. Altro BUYER tenta di chiudere la gara non sua -> 403 Forbidden
+        given()
+                .auth().oauth2(otherBuyerToken)
                 .when()
                 .put("/api/tenders/" + tenderId + "/close")
                 .then()
                 .statusCode(403);
 
-        // 6. BUYER chiude la gara -> 200 OK con aggiudicazione
+        // 9. BUYER creatore chiude la gara -> 200 OK con aggiudicazione
         given()
                 .auth().oauth2(buyerToken)
                 .when()
                 .put("/api/tenders/" + tenderId + "/close")
                 .then()
                 .statusCode(200)
-                .body("winningBid.bidderName", is("SecureTech SpA"));
+                .body("winningBid.bidderName", is("Supplier Test SpA"))
+                .body("winningBid.amount", is(42000.0f));
     }
 }

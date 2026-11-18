@@ -5,4 +5,6 @@ export interface Tender {
   budget: number;
   closingDate?: string;
   status: 'DRAFT' | 'OPEN' | 'CLOSED' | 'AWARDED';
+  createdByEmail?: string;
+  createdByName?: string;
 }

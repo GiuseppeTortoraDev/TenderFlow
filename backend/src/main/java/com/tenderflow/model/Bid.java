@@ -1,4 +1,3 @@
-
 package com.tenderflow.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -13,6 +12,7 @@ import java.time.LocalDateTime;
 public class Bid extends PanacheEntity {
 
     public String bidderName;
+    public String bidderEmail;
     public BigDecimal amount;
     public LocalDateTime submissionDate;
 
