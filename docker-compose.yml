@@ -57,8 +57,11 @@ services:
       QUARKUS_DATASOURCE_USERNAME: tenderflow_user
       QUARKUS_DATASOURCE_PASSWORD: tenderflow_password
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_PUBLIC_KEY_LOCATION: /deployments/certs/publicKey.pem
+      JWT_PRIVATE_KEY_LOCATION: /deployments/certs/privateKey.pem
     volumes:
       - uploads_data:/deployments/uploads
+      - ./certs:/deployments/certs:ro
     depends_on:
       postgres:
         condition: service_healthy

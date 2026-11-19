@@ -22,6 +22,12 @@ jobs:
           java-version: '17'
           cache: 'maven'
 
+      - name: Generate ephemeral RSA keys for JWT tests
+        run: |
+          mkdir -p certs
+          openssl genpkey -algorithm RSA -out certs/privateKey.pem -pkeyopt rsa_keygen_bits:2048
+          openssl rsa -pubout -in certs/privateKey.pem -out certs/publicKey.pem
+
       - name: Build and run backend tests
         working-directory: ./backend
         run: mvn clean verify

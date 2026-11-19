@@ -4,3 +4,7 @@ stato_progetto.txt
 
 # Documenti PDF caricati in locale
 backend/uploads/
+
+# Chiavi crittografiche JWT locali
+certs/
+*.pem
