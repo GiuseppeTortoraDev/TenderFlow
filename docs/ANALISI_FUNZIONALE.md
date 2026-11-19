@@ -2,7 +2,7 @@
 
 * **Sistema:** TenderFlow — Enterprise B2B Procurement & e-Tendering Platform
 * **Versione Release:** `v2.0.0` (Commercial Ready)
-* **Repository:** `TheGreenFogAlpha/ExampleProject`
+* **Repository:** `TheGreenFogAlpha/TenderFlow`
 * **Stack Tecnologico:** Quarkus 3.40 (Java 17) • Angular 22 (Signals) • PostgreSQL 15 • Apache Kafka (KRaft) • Nginx
 
 ---
